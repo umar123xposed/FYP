@@ -1,49 +1,54 @@
-const express = require('express');
-const multer = require('multer');
-const cors = require('cors');
-const { exec } = require('child_process');
-const path = require('path');
-const fs = require('fs');
+const express = require("express");
+const multer = require("multer");
+const { exec } = require("child_process");
+const path = require("path");
+const cors = require("cors");
 
 const app = express();
-const PORT = 3000;
+const upload = multer({ dest: "uploads/" });
 
-// Enable CORS
+// Enable CORS to allow requests from the frontend
 app.use(cors());
 
-// Set up multer for handling image uploads
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        const uploadPath = path.join(__dirname, 'uploads');
-        if (!fs.existsSync(uploadPath)) {
-            fs.mkdirSync(uploadPath);
-            console.log('Uploads folder created.');
-        }
-        cb(null, uploadPath);
-    },
-    filename: function (req, file, cb) {
-        cb(null, Date.now() + '-' + file.originalname);
-    }
-});
+// Route to handle image upload and prediction
+app.post("/predict", upload.single("image"), (req, res) => {
+    const imagePath = req.file.path;
+    const command = `python prediction.py ${imagePath}`;
+    console.log(`Executing: ${command}`);
 
-const upload = multer({ storage });
-
-// Route to handle image upload and run prediction
-app.post('/predict', upload.single('image'), (req, res) => {
-    const imagePath = path.join(__dirname, 'uploads', req.file.filename);
-    console.log(`Received Image Path: ${imagePath}`);
-
-    // Run Python prediction script
-    exec(`python prediction.py ${imagePath}`, (error, stdout, stderr) => {
+    exec(command, (error, stdout, stderr) => {
         if (error) {
-            console.error(`Error running prediction: ${stderr}`);
-            return res.status(500).json({ error: 'Prediction script failed.' });
+            console.error("Error executing Python script:", error);
+            return res.status(500).json({ error: "Error processing image." });
         }
-        console.log(`Prediction Output: ${stdout}`);
-        return res.status(200).json({ result: stdout });
+
+        const outputLines = stdout.split("\n");
+        const prediction = outputLines.find((line) =>
+            line.startsWith("Prediction:")
+        )?.replace("Prediction:", "").trim();
+        const heatmapPath = outputLines.find((line) =>
+            line.startsWith("Heatmap saved at:")
+        )?.replace("Heatmap saved at:", "").trim();
+
+        if (prediction && heatmapPath) {
+            // Normalize the heatmap path
+            const absoluteHeatmapPath = path.resolve(heatmapPath);
+            const heatmapUrl = `heatmaps/${path.basename(absoluteHeatmapPath)}`;
+
+            console.log(`Prediction: ${prediction}`);
+            console.log(`Heatmap URL: ${heatmapUrl}`);
+            return res.json({ result: prediction, heatmap_url: heatmapUrl });
+        } else {
+            return res.status(500).json({ error: "Error processing image." });
+        }
     });
 });
 
+// Serve static files from the backend root folder
+app.use("/heatmaps", express.static(path.join(__dirname)));
+
+// Start the server
+const PORT = 3000;
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });

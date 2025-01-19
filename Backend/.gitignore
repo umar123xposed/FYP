@@ -121,7 +121,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-Backend\node_modules
+node_modules/
 dist
 dist-ssr
 *.local
@@ -138,7 +138,7 @@ dist-ssr
 *.sw?
 
 uploads
-package-lock.json
+/package-lock.json
 output_with_heatmap.png
 License
 README.md

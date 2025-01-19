@@ -1,6 +1,6 @@
 @echo off
 REM Change to the frontend directory and start React
-cd C:\Users\Dell\OneDrive\Desktop\FYP\Frontend
+cd C:\Users\HP\Desktop\FYP\Frontend
 start cmd /k "npm run dev"
 
 REM Change to the backend directory and start Node.js server
